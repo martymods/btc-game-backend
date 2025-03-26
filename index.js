@@ -7,20 +7,38 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
+
+// Clearly configured CORS for your frontend URL
+app.use(cors({
+  origin: "https://dashing-frangipane-bfa8fa.netlify.app",
+  methods: ["GET", "POST"],
+  credentials: true
+}));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+
+// Socket.IO CORS settings clearly matching frontend
+const io = new Server(server, {
+  cors: {
+    origin: "https://dashing-frangipane-bfa8fa.netlify.app",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error(err));
 
-// BTC Price broadcast every 5 seconds
+// Coinbase API (No strict rate limits)
 setInterval(async () => {
-  const { data } = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-  io.emit('btc-price', data.bitcoin.usd);
+  try {
+    const { data } = await axios.get('https://api.coinbase.com/v2/prices/spot?currency=USD');
+    io.emit('btc-price', data.data.amount);
+  } catch (err) {
+    console.error('Error fetching Coinbase data:', err.message);
+  }
 }, 5000);
 
 // Socket.io Connections
@@ -29,7 +47,7 @@ io.on('connection', (socket) => {
 
   socket.on('prediction', data => {
     console.log('Prediction received:', data);
-    // Here you’ll add logic to handle prediction battles & save winners
+    // Add logic here for prediction battles & saving winners
   });
 
   socket.on('disconnect', () => console.log('Player disconnected:', socket.id));
